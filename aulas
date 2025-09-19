@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plataforma de Cursos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Barra Superior -->
+  <div class="bg-blue-600 text-white py-3 px-4 text-center font-bold text-lg shadow">
+    PROJETO DEV PATRICIA
+  </div>
+
+  <div class="flex items-center justify-center">
+    <!-- Login Page -->
+    <div id="loginPage" class="w-full max-w-xs mt-8">
+      <div class="bg-white shadow-md rounded px-8 pt-6 pb-8">
+        <h1 class="text-xl font-bold mb-4 text-center">Login</h1>
+        <input id="passwordInput" type="password" placeholder="Senha" class="shadow border rounded w-full py-2 px-3 mb-4">
+        <button onclick="login()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Entrar</button>
+        <p id="loginError" class="text-red-500 text-sm mt-2 hidden">Senha incorreta!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Course Selection Page -->
+  <div id="coursePage" class="hidden w-full p-4">
+    <h1 class="text-2xl font-bold mb-4 text-center">Meus Cursos</h1>
+    <div id="coursesContainer" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
+    <div class="text-center mt-6">
+      <button onclick="showAddCourse()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">Adicionar Curso</button>
+    </div>
+  </div>
+
+  <!-- Add Course Modal -->
+  <div id="addCourseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+      <h2 class="text-xl font-bold mb-4">Adicionar Curso</h2>
+      <input id="newCourseTitle" type="text" placeholder="Título do Curso" class="border w-full p-2 mb-2 rounded">
+      <input id="newCourseImage" type="text" placeholder="URL da Imagem" class="border w-full p-2 mb-2 rounded">
+      <div id="lessonsContainer" class="mb-2"></div>
+      <button onclick="addLessonField()" class="bg-blue-500 text-white px-3 py-1 rounded mb-2">Adicionar Aula</button>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeAddCourse()" class="px-4 py-2 bg-gray-300 rounded">Cancelar</button>
+        <button onclick="saveCourse()" class="px-4 py-2 bg-green-500 text-white rounded">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Course Viewer -->
+  <div id="courseViewer" class="hidden w-full p-4">
+    <button onclick="backToCourses()" class="mb-4 bg-gray-300 px-4 py-2 rounded">← Voltar</button>
+    <div id="courseDetails" class="bg-white shadow rounded p-4"></div>
+  </div>
+
+  <script>
+    let courses = JSON.parse(localStorage.getItem('courses')) || [];
+    let currentCourseIndex = null;
+
+    function login() {
+      const password = document.getElementById('passwordInput').value;
+      if (password === 'LOVE') {
+        document.getElementById('loginPage').classList.add('hidden');
+        document.getElementById('coursePage').classList.remove('hidden');
+        renderCourses();
+      } else {
+        document.getElementById('loginError').classList.remove('hidden');
+      }
+    }
+
+    function renderCourses() {
+      const container = document.getElementById('coursesContainer');
+      container.innerHTML = '';
+      courses.forEach((course, index) => {
+        const completedLessons = course.lessons.filter(l => l.completed).length;
+        const progress = Math.round((completedLessons / course.lessons.length) * 100);
+
+        const card = document.createElement('div');
+        card.className = "bg-white shadow rounded p-4 flex flex-col";
+        card.innerHTML = `
+          <img src="${course.image || 'https://via.placeholder.com/150'}" class="w-full h-32 object-cover rounded mb-2">
+          <h2 class="font-bold text-lg mb-2">${course.title}</h2>
+          <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+            <div class="bg-blue-500 h-2 rounded-full" style="width: ${progress}%"></div>
+          </div>
+          <button onclick="openCourse(${index})" class="bg-blue-500 text-white px-4 py-2 rounded mt-auto">Abrir</button>
+          ${progress === 100 ? '<p class="text-green-600 font-bold mt-2">🏅 Curso Concluído!</p>' : ''}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function showAddCourse() {
+      document.getElementById('addCourseModal').classList.remove('hidden');
+      document.getElementById('lessonsContainer').innerHTML = '';
+    }
+
+    function closeAddCourse() {
+      document.getElementById('addCourseModal').classList.add('hidden');
+    }
+
+    function addLessonField() {
+      const container = document.getElementById('lessonsContainer');
+      const div = document.createElement('div');
+      div.className = 'mb-2 border p-2 rounded';
+      div.innerHTML = `
+        <input type="text" placeholder="Título da Aula" class="border w-full p-1 mb-1 rounded lesson-title">
+        <input type="text" placeholder="URL do Vídeo (MP4)" class="border w-full p-1 mb-1 rounded lesson-video">
+        <textarea placeholder="Descrição" class="border w-full p-1 rounded lesson-desc"></textarea>
+      `;
+      container.appendChild(div);
+    }
+
+    function saveCourse() {
+      const title = document.getElementById('newCourseTitle').value;
+      const image = document.getElementById('newCourseImage').value;
+      const lessons = Array.from(document.querySelectorAll('#lessonsContainer div')).map(div => ({
+        title: div.querySelector('.lesson-title').value,
+        video: div.querySelector('.lesson-video').value,
+        desc: div.querySelector('.lesson-desc').value,
+        completed: false
+      }));
+
+      courses.push({ title, image, lessons });
+      localStorage.setItem('courses', JSON.stringify(courses));
+
+      closeAddCourse();
+      renderCourses();
+    }
+
+    function openCourse(index) {
+      currentCourseIndex = index;
+      const course = courses[index];
+      const container = document.getElementById('courseDetails');
+      container.innerHTML = `<h2 class="text-xl font-bold mb-4">${course.title}</h2>`;
+
+      course.lessons.forEach((lesson, i) => {
+        container.innerHTML += `
+          <div class="mb-4 p-3 border rounded">
+            <h3 class="font-bold mb-2">${lesson.title}</h3>
+            <video controls class="w-full mb-2" onended="markLessonComplete(${i})">
+              <source src="${lesson.video}" type="video/mp4">
+            </video>
+            <p>${lesson.desc}</p>
+          </div>`;
+      });
+
+      container.innerHTML += `
+        <button onclick="deleteCourse()" class="mt-4 bg-red-500 text-white px-4 py-2 rounded">Excluir Curso</button>
+      `;
+
+      document.getElementById('coursePage').classList.add('hidden');
+      document.getElementById('courseViewer').classList.remove('hidden');
+    }
+
+    function markLessonComplete(i) {
+      courses[currentCourseIndex].lessons[i].completed = true;
+      localStorage.setItem('courses', JSON.stringify(courses));
+      renderCourses();
+    }
+
+    function backToCourses() {
+      document.getElementById('courseViewer').classList.add('hidden');
+      document.getElementById('coursePage').classList.remove('hidden');
+      renderCourses();
+    }
+
+    function deleteCourse() {
+      const password = prompt("Digite a senha para excluir (DELETE):");
+      if (password === 'DELETE') {
+        courses.splice(currentCourseIndex, 1);
+        localStorage.setItem('courses', JSON.stringify(courses));
+        backToCourses();
+      } else {
+        alert("Senha incorreta!");
+      }
+    }
+  </script>
+</body>
+</html>
