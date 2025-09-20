@@ -3,179 +3,230 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plataforma de Cursos</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>PROJETO DEV PATRICIA</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header { background: #4CAF50; color: white; padding: 1rem; text-align: center; font-size: 20px; font-weight: bold; }
+    .container { padding: 1rem; }
+    .card { border: 1px solid #ddd; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
+    .progress { width: 100%; background: #eee; height: 10px; border-radius: 5px; margin-top: 5px; }
+    .progress-bar { height: 10px; background: #4CAF50; width: 0%; border-radius: 5px; }
+    button { padding: 10px; margin-top: 10px; border: none; background: #4CAF50; color: white; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #45a049; }
+    video { width: 100%; margin-top: 10px; }
+  </style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
-
-  <!-- Barra Superior -->
-  <div class="bg-blue-600 text-white py-3 px-4 text-center font-bold text-lg shadow">
-    PROJETO DEV PATRICIA
-  </div>
-
-  <div class="flex items-center justify-center">
-    <!-- Login Page -->
-    <div id="loginPage" class="w-full max-w-xs mt-8">
-      <div class="bg-white shadow-md rounded px-8 pt-6 pb-8">
-        <h1 class="text-xl font-bold mb-4 text-center">Login</h1>
-        <input id="passwordInput" type="password" placeholder="Senha" class="shadow border rounded w-full py-2 px-3 mb-4">
-        <button onclick="login()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">Entrar</button>
-        <p id="loginError" class="text-red-500 text-sm mt-2 hidden">Senha incorreta!</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Course Selection Page -->
-  <div id="coursePage" class="hidden w-full p-4">
-    <h1 class="text-2xl font-bold mb-4 text-center">Meus Cursos</h1>
-    <div id="coursesContainer" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
-    <div class="text-center mt-6">
-      <button onclick="showAddCourse()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">Adicionar Curso</button>
-    </div>
-  </div>
-
-  <!-- Add Course Modal -->
-  <div id="addCourseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
-      <h2 class="text-xl font-bold mb-4">Adicionar Curso</h2>
-      <input id="newCourseTitle" type="text" placeholder="Título do Curso" class="border w-full p-2 mb-2 rounded">
-      <input id="newCourseImage" type="text" placeholder="URL da Imagem" class="border w-full p-2 mb-2 rounded">
-      <div id="lessonsContainer" class="mb-2"></div>
-      <button onclick="addLessonField()" class="bg-blue-500 text-white px-3 py-1 rounded mb-2">Adicionar Aula</button>
-      <div class="flex justify-end gap-2">
-        <button onclick="closeAddCourse()" class="px-4 py-2 bg-gray-300 rounded">Cancelar</button>
-        <button onclick="saveCourse()" class="px-4 py-2 bg-green-500 text-white rounded">Salvar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Course Viewer -->
-  <div id="courseViewer" class="hidden w-full p-4">
-    <button onclick="backToCourses()" class="mb-4 bg-gray-300 px-4 py-2 rounded">← Voltar</button>
-    <div id="courseDetails" class="bg-white shadow rounded p-4"></div>
-  </div>
+<body>
+  <header>PROJETO DEV PATRICIA</header>
+  <div class="container" id="app"></div>
 
   <script>
-    let courses = JSON.parse(localStorage.getItem('courses')) || [];
-    let currentCourseIndex = null;
+    // 🔑 CONFIGURAÇÃO DO FIREBASE (substitua com suas credenciais!)
+    const firebaseConfig = {
+      apiKey: "SUA_API_KEY",
+      authDomain: "SEU_AUTH_DOMAIN",
+      projectId: "SEU_PROJECT_ID",
+      storageBucket: "SEU_BUCKET",
+      messagingSenderId: "SEU_SENDER_ID",
+      appId: "SEU_APP_ID"
+    };
 
-    function login() {
-      const password = document.getElementById('passwordInput').value;
-      if (password === 'LOVE') {
-        document.getElementById('loginPage').classList.add('hidden');
-        document.getElementById('coursePage').classList.remove('hidden');
-        renderCourses();
-      } else {
-        document.getElementById('loginError').classList.remove('hidden');
-      }
+    // Inicializa Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    const appDiv = document.getElementById("app");
+
+    let senhaCorreta = false;
+
+    // 🔐 Login Persistente
+    if(localStorage.getItem("logado") === "true") {
+      senhaCorreta = true;
+      mostrarCursos();
+    } else {
+      mostrarLogin();
     }
 
-    function renderCourses() {
-      const container = document.getElementById('coursesContainer');
-      container.innerHTML = '';
-      courses.forEach((course, index) => {
-        const completedLessons = course.lessons.filter(l => l.completed).length;
-        const progress = Math.round((completedLessons / course.lessons.length) * 100);
-
-        const card = document.createElement('div');
-        card.className = "bg-white shadow rounded p-4 flex flex-col";
-        card.innerHTML = `
-          <img src="${course.image || 'https://via.placeholder.com/150'}" class="w-full h-32 object-cover rounded mb-2">
-          <h2 class="font-bold text-lg mb-2">${course.title}</h2>
-          <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-            <div class="bg-blue-500 h-2 rounded-full" style="width: ${progress}%"></div>
-          </div>
-          <button onclick="openCourse(${index})" class="bg-blue-500 text-white px-4 py-2 rounded mt-auto">Abrir</button>
-          ${progress === 100 ? '<p class="text-green-600 font-bold mt-2">🏅 Curso Concluído!</p>' : ''}
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    function showAddCourse() {
-      document.getElementById('addCourseModal').classList.remove('hidden');
-      document.getElementById('lessonsContainer').innerHTML = '';
-    }
-
-    function closeAddCourse() {
-      document.getElementById('addCourseModal').classList.add('hidden');
-    }
-
-    function addLessonField() {
-      const container = document.getElementById('lessonsContainer');
-      const div = document.createElement('div');
-      div.className = 'mb-2 border p-2 rounded';
-      div.innerHTML = `
-        <input type="text" placeholder="Título da Aula" class="border w-full p-1 mb-1 rounded lesson-title">
-        <input type="text" placeholder="URL do Vídeo (MP4)" class="border w-full p-1 mb-1 rounded lesson-video">
-        <textarea placeholder="Descrição" class="border w-full p-1 rounded lesson-desc"></textarea>
+    function mostrarLogin() {
+      appDiv.innerHTML = `
+        <h2>Login</h2>
+        <input type="password" id="senha" placeholder="Digite a senha">
+        <button onclick="fazerLogin()">Entrar</button>
       `;
-      container.appendChild(div);
     }
 
-    function saveCourse() {
-      const title = document.getElementById('newCourseTitle').value;
-      const image = document.getElementById('newCourseImage').value;
-      const lessons = Array.from(document.querySelectorAll('#lessonsContainer div')).map(div => ({
-        title: div.querySelector('.lesson-title').value,
-        video: div.querySelector('.lesson-video').value,
-        desc: div.querySelector('.lesson-desc').value,
-        completed: false
-      }));
-
-      courses.push({ title, image, lessons });
-      localStorage.setItem('courses', JSON.stringify(courses));
-
-      closeAddCourse();
-      renderCourses();
-    }
-
-    function openCourse(index) {
-      currentCourseIndex = index;
-      const course = courses[index];
-      const container = document.getElementById('courseDetails');
-      container.innerHTML = `<h2 class="text-xl font-bold mb-4">${course.title}</h2>`;
-
-      course.lessons.forEach((lesson, i) => {
-        container.innerHTML += `
-          <div class="mb-4 p-3 border rounded">
-            <h3 class="font-bold mb-2">${lesson.title}</h3>
-            <video controls class="w-full mb-2" onended="markLessonComplete(${i})">
-              <source src="${lesson.video}" type="video/mp4">
-            </video>
-            <p>${lesson.desc}</p>
-          </div>`;
-      });
-
-      container.innerHTML += `
-        <button onclick="deleteCourse()" class="mt-4 bg-red-500 text-white px-4 py-2 rounded">Excluir Curso</button>
-      `;
-
-      document.getElementById('coursePage').classList.add('hidden');
-      document.getElementById('courseViewer').classList.remove('hidden');
-    }
-
-    function markLessonComplete(i) {
-      courses[currentCourseIndex].lessons[i].completed = true;
-      localStorage.setItem('courses', JSON.stringify(courses));
-      renderCourses();
-    }
-
-    function backToCourses() {
-      document.getElementById('courseViewer').classList.add('hidden');
-      document.getElementById('coursePage').classList.remove('hidden');
-      renderCourses();
-    }
-
-    function deleteCourse() {
-      const password = prompt("Digite a senha para excluir (DELETE):");
-      if (password === 'DELETE') {
-        courses.splice(currentCourseIndex, 1);
-        localStorage.setItem('courses', JSON.stringify(courses));
-        backToCourses();
+    function fazerLogin() {
+      const senha = document.getElementById("senha").value;
+      if(senha === "LOVE") {
+        localStorage.setItem("logado", "true");
+        senhaCorreta = true;
+        mostrarCursos();
       } else {
         alert("Senha incorreta!");
       }
+    }
+
+    // 📚 Mostrar Cursos
+    function mostrarCursos() {
+      appDiv.innerHTML = `
+        <h2>Cursos Disponíveis</h2>
+        <div id="cursos"></div>
+        <button onclick="formAdicionarCurso()">Adicionar Curso</button>
+      `;
+
+      const cursosDiv = document.getElementById("cursos");
+
+      db.collection("cursos").onSnapshot(snapshot => {
+        cursosDiv.innerHTML = "";
+        snapshot.forEach(doc => {
+          const curso = doc.data();
+          cursosDiv.innerHTML += `
+            <div class="card">
+              <h3>${curso.titulo}</h3>
+              ${curso.imagem ? `<img src="${curso.imagem}" style="width:100%;max-height:150px;object-fit:cover;">` : ""}
+              <div class="progress"><div class="progress-bar" style="width:${curso.progresso||0}%"></div></div>
+              <button onclick="abrirCurso('${doc.id}')">Abrir Curso</button>
+            </div>
+          `;
+        });
+      });
+    }
+
+    // ➕ Adicionar Curso
+    function formAdicionarCurso() {
+      appDiv.innerHTML = `
+        <h2>Novo Curso</h2>
+        <input id="tituloCurso" placeholder="Título do curso"><br>
+        <input type="file" id="imgCurso"><br>
+        <button onclick="salvarCurso()">Salvar Curso</button>
+        <button onclick="mostrarCursos()">Cancelar</button>
+      `;
+    }
+
+    async function salvarCurso() {
+      const titulo = document.getElementById("tituloCurso").value;
+      const arquivo = document.getElementById("imgCurso").files[0];
+
+      let urlImg = "";
+      if(arquivo) {
+        const ref = storage.ref("imagens/" + arquivo.name);
+        await ref.put(arquivo);
+        urlImg = await ref.getDownloadURL();
+      }
+
+      await db.collection("cursos").add({
+        titulo: titulo,
+        imagem: urlImg,
+        progresso: 0
+      });
+
+      mostrarCursos();
+    }
+
+    // 🎥 Abrir Curso
+    function abrirCurso(id) {
+      db.collection("cursos").doc(id).get().then(doc => {
+        const curso = doc.data();
+        appDiv.innerHTML = `
+          <h2>${curso.titulo}</h2>
+          <div id="aulas"></div>
+          <button onclick="formAdicionarAula('${id}')">Adicionar Aula</button>
+          <button onclick="mostrarCursos()">Voltar</button>
+          <button style="background:red" onclick="excluirCurso('${id}')">Excluir Curso</button>
+        `;
+
+        const aulasDiv = document.getElementById("aulas");
+
+        db.collection("cursos").doc(id).collection("aulas").onSnapshot(snapshot => {
+          aulasDiv.innerHTML = "";
+          let total = 0, assistidas = 0;
+
+          snapshot.forEach(docAula => {
+            const aula = docAula.data();
+            total++;
+            aulasDiv.innerHTML += `
+              <div class="card">
+                <h4>${aula.titulo}</h4>
+                ${aula.descricao ? `<p>${aula.descricao}</p>` : ""}
+                <video controls src="${aula.video}"></video>
+                <button onclick="concluirAula('${id}','${docAula.id}')">Concluir Aula</button>
+              </div>
+            `;
+            if(aula.concluida) assistidas++;
+          });
+
+          // Atualizar progresso
+          let progresso = total > 0 ? (assistidas/total)*100 : 0;
+          db.collection("cursos").doc(id).update({progresso: progresso});
+        });
+      });
+    }
+
+    // 🗑️ Excluir Curso com senha DELETE
+    async function excluirCurso(idCurso) {
+      const senha = prompt("Digite a senha para excluir este curso:");
+      if (senha !== "DELETE") {
+        alert("Senha incorreta. O curso não será excluído.");
+        return;
+      }
+
+      // Apagar todas as aulas do curso
+      const aulasSnap = await db.collection("cursos").doc(idCurso).collection("aulas").get();
+      const batch = db.batch();
+      aulasSnap.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+
+      // Apagar o curso
+      await db.collection("cursos").doc(idCurso).delete();
+
+      alert("Curso excluído com sucesso!");
+      mostrarCursos();
+    }
+
+    // ➕ Adicionar Aula
+    function formAdicionarAula(idCurso) {
+      appDiv.innerHTML = `
+        <h2>Nova Aula</h2>
+        <input id="tituloAula" placeholder="Título da aula"><br>
+        <textarea id="descricaoAula" placeholder="Descrição"></textarea><br>
+        <input type="file" id="videoAula"><br>
+        <button onclick="salvarAula('${idCurso}')">Salvar Aula</button>
+        <button onclick="abrirCurso('${idCurso}')">Cancelar</button>
+      `;
+    }
+
+    async function salvarAula(idCurso) {
+      const titulo = document.getElementById("tituloAula").value;
+      const descricao = document.getElementById("descricaoAula").value;
+      const arquivo = document.getElementById("videoAula").files[0];
+
+      let urlVideo = "";
+      if(arquivo) {
+        const ref = storage.ref("videos/" + arquivo.name);
+        await ref.put(arquivo);
+        urlVideo = await ref.getDownloadURL();
+      }
+
+      await db.collection("cursos").doc(idCurso).collection("aulas").add({
+        titulo: titulo,
+        descricao: descricao,
+        video: urlVideo,
+        concluida: false
+      });
+
+      abrirCurso(idCurso);
+    }
+
+    // ✔️ Concluir Aula
+    function concluirAula(idCurso, idAula) {
+      db.collection("cursos").doc(idCurso).collection("aulas").doc(idAula).update({
+        concluida: true
+      });
     }
   </script>
 </body>
